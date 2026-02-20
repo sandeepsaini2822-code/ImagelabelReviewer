@@ -93,18 +93,20 @@ export default function ImageReviewer() {
   useEffect(() => {
     let alive = true
 
-    fetch("/api/auth/me", {
+    fetch("/api/auth/ping", {
       credentials: "include",
-      cache: "no-store", // ✅ important: don't use cached auth response
+      cache: "no-store",
     })
       .then((res) => {
         if (!alive) return
         if (!res.ok) router.replace("/login")
+        else setAuthChecked(true)
       })
       .catch(() => {
         if (!alive) return
         router.replace("/login")
       })
+
 
     return () => {
       alive = false
@@ -419,7 +421,7 @@ export default function ImageReviewer() {
     const delta = e.deltaY > 0 ? -0.1 : 0.1
     setZoom((z) => clampZoom(Number((z + delta).toFixed(2))))
   }
- 
+
 
   function onPointerDown(e: React.PointerEvent) {
     ; (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
@@ -460,7 +462,7 @@ export default function ImageReviewer() {
       img.src = prev.imageUrl
     }
   }, [index, images])
-
+if (!authChecked) {
   return (
     <main className="h-dvh overflow-hidden bg-zinc-950 text-zinc-100">
       <div className="h-full flex flex-col">
@@ -676,4 +678,5 @@ export default function ImageReviewer() {
 
     </main>
   )
+}
 }
