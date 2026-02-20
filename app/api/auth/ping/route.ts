@@ -9,3 +9,4 @@ export async function GET() {
   if (!token) return NextResponse.json({ ok: false }, { status: 401 })
   return NextResponse.json({ ok: true })
 }
+//app\api\auth\ping\route.ts
