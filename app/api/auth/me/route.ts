@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server"
 import { cookies } from "next/headers"
-import { verifyCognitoIdToken } from "@/lib/auth"
 
 export async function GET() {
   const cookieName = process.env.AUTH_COOKIE_NAME ?? "agri_auth"
@@ -9,10 +8,6 @@ export async function GET() {
 
   if (!token) return NextResponse.json({ ok: false }, { status: 401 })
 
-  try {
-    const user = await verifyCognitoIdToken(token)
-    return NextResponse.json({ ok: true, user: { email: user?.email, sub: user?.sub } })
-  } catch (e: any) {
-    return NextResponse.json({ ok: false, message: e?.message ?? "Invalid/expired" }, { status: 401 })
-  }
+  // minimal "me" response (you can expand later)
+  return NextResponse.json({ ok: true })
 }
