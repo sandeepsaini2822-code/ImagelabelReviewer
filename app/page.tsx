@@ -7,7 +7,6 @@ import ImageCanvas from "@/components/dashboard/ImageCanvas"
 import MetadataPanel from "@/components/dashboard/MetadataPanel"
 import { useRouter } from "next/navigation"
 
-
 type ImageItem = {
   key: string
   s3Key?: string
@@ -67,36 +66,16 @@ const DEFAULT_FILTERS: Filters = {
   diseaseName: "all",
 }
 
-
 export default function ImageReviewer() {
-  const router = useRouter() // for navigation after logout
-  const loggingOutRef = useRef(false)
-  const [nextCursor, setNextCursor] = useState<string | null>(null)
-  const [pageLoading, setPageLoading] = useState(false)
-  const [direction, setDirection] = useState<1 | -1>(1)
-  const [images, setImages] = useState<ImageItem[]>([])
-  const [index, setIndex] = useState(0)
+  const router = useRouter()
+
+  // ---------- AUTH GATE ----------
   const [authChecked, setAuthChecked] = useState(false)
 
-  const [editable, setEditable] = useState(false)
-  const [loading, setLoading] = useState(true)
-  const [saving, setSaving] = useState(false)
-  const [refreshing, setRefreshing] = useState(false)
-  const [dirty, setDirty] = useState(false)
-  const [filters, setFilters] = useState(DEFAULT_FILTERS)
-  const [toast, setToast] = useState<{
-    type: "success" | "error"
-    message: string
-  } | null>(null)
-
-  // ✅ Protect dashboard: if not logged in OR token expired -> go to /login
   useEffect(() => {
     let alive = true
 
-    fetch("/api/auth/ping", {
-      credentials: "include",
-      cache: "no-store",
-    })
+    fetch("/api/auth/ping", { credentials: "include", cache: "no-store" })
       .then((res) => {
         if (!alive) return
         if (!res.ok) router.replace("/login")
@@ -107,19 +86,40 @@ export default function ImageReviewer() {
         router.replace("/login")
       })
 
-
     return () => {
       alive = false
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [router])
+
+  if (!authChecked) {
+    return (
+      <main className="min-h-screen flex items-center justify-center bg-zinc-950 text-white">
+        <div className="text-lg">Checking session...</div>
+      </main>
+    )
+  }
+
+  // ---------- STATE ----------
+  const loggingOutRef = useRef(false)
+  const [nextCursor, setNextCursor] = useState<string | null>(null)
+  const [pageLoading, setPageLoading] = useState(false)
+  const [direction, setDirection] = useState<1 | -1>(1)
+  const [images, setImages] = useState<ImageItem[]>([])
+  const [index, setIndex] = useState(0)
+
+  const [editable, setEditable] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [refreshing, setRefreshing] = useState(false)
+  const [dirty, setDirty] = useState(false)
+  const [filters, setFilters] = useState(DEFAULT_FILTERS)
+
+  const [toast, setToast] = useState<{ type: "success" | "error"; message: string } | null>(null)
 
   useEffect(() => {
     if (!toast) return
-    const timer = setTimeout(() => setToast(null), 3000)
-    return () => clearTimeout(timer)
+    const t = setTimeout(() => setToast(null), 3000)
+    return () => clearTimeout(t)
   }, [toast])
-
 
   // keep latest cursor in a ref (prevents stale closure issues)
   const nextCursorRef = useRef<string | null>(null)
@@ -133,13 +133,7 @@ export default function ImageReviewer() {
   // --------- Zoom + Pan state ----------
   const [zoom, setZoom] = useState(1)
   const [pan, setPan] = useState({ x: 0, y: 0 })
-  const dragRef = useRef<{
-    active: boolean
-    startX: number
-    startY: number
-    baseX: number
-    baseY: number
-  }>({
+  const dragRef = useRef({
     active: false,
     startX: 0,
     startY: 0,
@@ -147,7 +141,6 @@ export default function ImageReviewer() {
     baseY: 0,
   })
 
-  // Reset zoom/pan when changing image
   useEffect(() => {
     setZoom(1)
     setPan({ x: 0, y: 0 })
@@ -160,7 +153,6 @@ export default function ImageReviewer() {
       const params = new URLSearchParams()
       params.set("limit", "20")
 
-      // send filters
       if (filters.crop !== "all") params.set("crop", filters.crop)
       if (filters.pestDetected !== null) params.set("pestDetected", String(filters.pestDetected))
       if (filters.diseaseDetected !== null) params.set("diseaseDetected", String(filters.diseaseDetected))
@@ -173,13 +165,11 @@ export default function ImageReviewer() {
         cache: "no-store",
       })
 
-      // ✅ If logged out / session expired, don't throw -> just go to login
       if (res.status === 401) {
         router.replace("/login")
         return
       }
 
-      // ✅ Safely parse JSON (avoid crash if response isn't JSON)
       let json: any = null
       try {
         json = await res.json()
@@ -192,13 +182,6 @@ export default function ImageReviewer() {
         throw new Error(json?.error ?? "Failed to fetch images")
       }
 
-      console.log("PAGE:", {
-        got: (json?.items ?? []).length,
-        nextCursor: json?.nextCursor,
-        append,
-      })
-
-      // IMPORTANT: don't overwrite fields with blanks; only fill defaults if missing
       const normalized: ImageItem[] = (json?.items ?? []).map((img: ImageItem) => ({
         ...img,
         createdAt: img.createdAt ?? new Date().toISOString(),
@@ -216,14 +199,11 @@ export default function ImageReviewer() {
       setImages((prev) => (append ? [...prev, ...normalized] : normalized))
       setNextCursor(json?.nextCursor ?? null)
 
-      // only reset index on fresh load, not append
       if (!append) setIndex(0)
     } finally {
       setPageLoading(false)
-      setLoading(false)
     }
   }
-
 
   // initial + refetch when filters change
   useEffect(() => {
@@ -240,52 +220,45 @@ export default function ImageReviewer() {
 
     setImages((prev) => {
       const copy = [...prev]
-      if (!copy[index] && copy[0]) return prev
       const safeIndex = copy[index] ? index : 0
+      if (!copy[safeIndex]) return prev
       copy[safeIndex] = { ...copy[safeIndex], [field]: value }
       return copy
     })
   }
 
   function isAlphabetOnly(value: string) {
-    if (!value) return true // allow empty
+    if (!value) return true
     return /^[A-Za-z\s]+$/.test(value)
   }
 
-
   async function saveChanges() {
-    if (!current) return
+    const cur = current
+    if (!cur) return
 
-    // ✅ VALIDATION FIRST
-    if (!isAlphabetOnly(current.pestName ?? "")) {
-      setToast({
-        type: "error",
-        message: "Pest name can only contain alphabets.",
-      })
+    if (!isAlphabetOnly(cur.pestName ?? "")) {
+      setToast({ type: "error", message: "Pest name can only contain alphabets." })
+      return
+    }
+    if (!isAlphabetOnly(cur.diseaseName ?? "")) {
+      setToast({ type: "error", message: "Disease name can only contain alphabets." })
       return
     }
 
-    if (!isAlphabetOnly(current.diseaseName ?? "")) {
-      setToast({
-        type: "error",
-        message: "Disease name can only contain alphabets.",
-      })
-      return
-    }
     try {
       setSaving(true)
 
       const payload = {
-        key: current.key,
-        plantingDate: current.plantingDate ?? "",
-        pestDetected: current.pestDetected,
-        diseaseDetected: current.diseaseDetected,
-        goldStandard: current.isGoldStandard,
-        pestName: current.pestName ?? "",
-        pestStage: current.pestStage ?? "",
-        diseaseName: current.diseaseName ?? "",
-        cropStage: current.cropStage ?? "",
-        remarks: current.remarks ?? "",
+        key: cur.key,
+        plantingDate: cur.plantingDate ?? "",
+        pestDetected: cur.pestDetected,
+        diseaseDetected: cur.diseaseDetected,
+        goldStandard: cur.isGoldStandard,
+        pestName: cur.pestName ?? "",
+        pestStage: cur.pestStage ?? "",
+        diseaseName: cur.diseaseName ?? "",
+        cropStage: cur.cropStage ?? "",
+        remarks: cur.remarks ?? "",
       }
 
       const res = await fetch("/api/images/update", {
@@ -295,37 +268,27 @@ export default function ImageReviewer() {
         body: JSON.stringify(payload),
       })
 
-      const data = await res.json()
+      const data = await res.json().catch(() => null)
 
       if (!res.ok || !data?.ok) {
-        setToast({
-          type: "error",
-          message: data?.message ?? "Failed to save changes",
-        })
+        setToast({ type: "error", message: data?.message ?? "Failed to save changes" })
         return
       }
 
-      setToast({
-        type: "success",
-        message: "Changes saved successfully!",
-      })
-
+      setToast({ type: "success", message: "Changes saved successfully!" })
       setEditable(false)
       setDirty(false)
     } catch (e: any) {
-      setToast({
-        type: "error",
-        message: e?.message ?? "Unexpected error",
-      })
+      setToast({ type: "error", message: e?.message ?? "Unexpected error" })
     } finally {
       setSaving(false)
     }
   }
 
-
   // --------- Auto-save on navigation ----------
   async function goPrev() {
     if (index === 0) return
+    setDirection(-1)
     if (editable && dirty) await saveChanges()
     setIndex((i) => Math.max(0, i - 1))
     setEditable(false)
@@ -333,7 +296,8 @@ export default function ImageReviewer() {
   }
 
   async function goNext() {
-    // move within loaded list
+    setDirection(1)
+
     if (index < images.length - 1) {
       if (editable && dirty) await saveChanges()
       setIndex((i) => i + 1)
@@ -342,16 +306,13 @@ export default function ImageReviewer() {
       return
     }
 
-    // at end: load more if cursor exists
     const cursor = nextCursorRef.current
     if (!cursor || pageLoading) return
 
     if (editable && dirty) await saveChanges()
 
-    console.log("END REACHED -> loading more", { cursor, index, len: images.length })
     await fetchPage(cursor, true)
 
-    // move into the newly appended page
     setIndex((i) => i + 1)
     setEditable(false)
     setDirty(false)
@@ -404,7 +365,6 @@ export default function ImageReviewer() {
   function clampZoom(z: number) {
     return Math.min(4, Math.max(1, z))
   }
-
   function zoomIn() {
     setZoom((z) => clampZoom(Number((z + 0.2).toFixed(2))))
   }
@@ -415,30 +375,26 @@ export default function ImageReviewer() {
     setZoom(1)
     setPan({ x: 0, y: 0 })
   }
-
   function onWheelZoom(e: React.WheelEvent) {
     e.preventDefault()
     const delta = e.deltaY > 0 ? -0.1 : 0.1
     setZoom((z) => clampZoom(Number((z + delta).toFixed(2))))
   }
 
-
   function onPointerDown(e: React.PointerEvent) {
-    ; (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
+    ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
     dragRef.current.active = true
     dragRef.current.startX = e.clientX
     dragRef.current.startY = e.clientY
     dragRef.current.baseX = pan.x
     dragRef.current.baseY = pan.y
   }
-
   function onPointerMove(e: React.PointerEvent) {
     if (!dragRef.current.active) return
     const dx = e.clientX - dragRef.current.startX
     const dy = e.clientY - dragRef.current.startY
     setPan({ x: dragRef.current.baseX + dx, y: dragRef.current.baseY + dy })
   }
-
   function onPointerUp() {
     dragRef.current.active = false
   }
@@ -462,7 +418,7 @@ export default function ImageReviewer() {
       img.src = prev.imageUrl
     }
   }, [index, images])
-if (!authChecked) {
+
   return (
     <main className="h-dvh overflow-hidden bg-zinc-950 text-zinc-100">
       <div className="h-full flex flex-col">
@@ -471,15 +427,12 @@ if (!authChecked) {
             <span className="text-white">Image Label</span>{" "}
             <span className="text-green-700/80">Reviewer</span>
           </h3>
-
-
         </div>
 
         {/* FILTER BAR */}
         <div className="shrink-0 px-10 pt-3">
           <div className="max-w-400 mx-auto">
             <div className="bg-green-700/80 backdrop-blur border border-white/10 rounded px-3 py-2 flex flex-wrap items-center gap-3 text-xs">
-              {/* LEFT SIDE (Logo) */}
               <div className="flex items-center">
                 <img
                   src="https://res.cloudinary.com/dgwhmqdhr/image/upload/v1769143824/annam-white-with-icon_cp78pb.png"
@@ -488,9 +441,7 @@ if (!authChecked) {
                 />
               </div>
 
-              {/* RIGHT SIDE (Filters) */}
               <div className="ml-auto flex flex-wrap items-center gap-3">
-                {/* Crop */}
                 <div className="flex items-center gap-2">
                   <span className="text-white">Crop</span>
                   <select
@@ -507,7 +458,6 @@ if (!authChecked) {
                   </select>
                 </div>
 
-                {/* Pest */}
                 <div className="flex items-center gap-2">
                   <span className="text-white">Pest</span>
                   <select
@@ -526,13 +476,10 @@ if (!authChecked) {
                   </select>
                 </div>
 
-                {/* Disease */}
                 <div className="flex items-center gap-2">
                   <span className="text-white">Disease</span>
                   <select
-                    value={
-                      filters.diseaseDetected === null ? "all" : filters.diseaseDetected ? "yes" : "no"
-                    }
+                    value={filters.diseaseDetected === null ? "all" : filters.diseaseDetected ? "yes" : "no"}
                     onChange={(e) =>
                       setFilters((f) => ({
                         ...f,
@@ -547,7 +494,6 @@ if (!authChecked) {
                   </select>
                 </div>
 
-                {/* Gold */}
                 <div className="flex items-center gap-2">
                   <span className="text-white">Gold</span>
                   <select
@@ -568,34 +514,21 @@ if (!authChecked) {
 
                 <div className="flex-1" />
 
-                {/* Reset */}
                 <button
                   onClick={() => setFilters(DEFAULT_FILTERS)}
-                  className="h-8 px-3 rounded bg-zinc-900 text-white text-xs  hover:bg-zinc-700 "
+                  className="h-8 px-3 rounded bg-zinc-900 text-white text-xs hover:bg-zinc-700"
                 >
                   Reset
                 </button>
 
-                {/* <button
-                  onClick={async () => {
-                    await fetch("/logout", { method: "POST", credentials: "include" })
-                    router.replace("/login")
-                    router.refresh()
-                  }}
-                  className="h-8 px-3 rounded bg-red-900 text-white text-xs hover:bg-red-700"
-                >
-                  Logout
-                </button> */}
                 <button
                   onClick={async () => {
                     loggingOutRef.current = true
-
-                    // optional: stop UI activity immediately
                     setImages([])
                     setNextCursor(null)
 
                     const res = await fetch("/logout", { method: "POST", credentials: "include" })
-                    const data = await res.json()
+                    const data = await res.json().catch(() => null)
 
                     if (data?.logoutUrl) window.location.href = data.logoutUrl
                     else router.replace("/login")
@@ -605,12 +538,7 @@ if (!authChecked) {
                   Logout
                 </button>
 
-
-
-                {/* Debug loading state */}
-                {pageLoading ? (
-                  <span className="text-white/80 text-xs">Loading…</span>
-                ) : null}
+                {pageLoading ? <span className="text-white/80 text-xs">Loading…</span> : null}
               </div>
             </div>
           </div>
@@ -639,7 +567,7 @@ if (!authChecked) {
                   goPrev={goPrev}
                   goNext={goNext}
                   canPrev={index > 0}
-                  canNext={index < images.length - 1 || !!nextCursor} // ✅ IMPORTANT: allow load-more
+                  canNext={index < images.length - 1 || !!nextCursor}
                 />
               }
               right={
@@ -661,22 +589,18 @@ if (!authChecked) {
           </div>
         </div>
       </div>
-      {/* Toast */}
+
       {toast && (
         <div className="fixed bottom-6 right-6 z-50">
           <div
-            className={`px-5 py-3 rounded-lg shadow-lg text-white text-sm transition-all duration-300
-      ${toast.type === "success"
-                ? "bg-green-600"
-                : "bg-red-600"
-              }`}
+            className={`px-5 py-3 rounded-lg shadow-lg text-white text-sm transition-all duration-300 ${
+              toast.type === "success" ? "bg-green-600" : "bg-red-600"
+            }`}
           >
             {toast.message}
           </div>
         </div>
       )}
-
     </main>
   )
-}
 }
