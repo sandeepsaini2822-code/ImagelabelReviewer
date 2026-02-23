@@ -12,10 +12,6 @@ type Props = {
  * Dashboard layout wrapper: 60/40 split (3/2 in a 5-col grid)
  * - Desktop: left 60%, right 40%
  * - Mobile: stacked (1 column)
- *
- * Non-breaking:
- * - You can use <DashboardLayout left={...} right={...} />
- * - Or use <DashboardLayout> with DashboardLayout.Left / Right
  */
 export function DashboardLayout({
   left,
@@ -27,22 +23,41 @@ export function DashboardLayout({
   return (
     <div
       className={
-        "rounded-xl shadow-lg overflow-hidden w-full " +
+        "rounded-xl shadow-lg w-full " +
+        // responsive grid + spacing
         "grid grid-cols-1 lg:grid-cols-5 bg-white " +
-        "h-full min-h-0 " +
+        // height behavior: don't force h-full; allow it to size naturally
+        "min-h-0 " +
+        // prevent horizontal overflow on small screens (without clipping vertical content)
+        "overflow-x-hidden " +
         className
       }
-
     >
       {/* LEFT (60%) */}
-      <div className={"h-full min-h-0 lg:col-span-3 bg-zinc-800 relative p-3 overflow-hidden " + leftClassName}>
-
+      <div
+        className={
+          "min-h-0 lg:col-span-3 bg-zinc-800 relative " +
+          // responsive padding
+          "p-3 sm:p-4 " +
+          // allow content to scroll if needed (fixes clipping on laptops)
+          "overflow-auto " +
+          leftClassName
+        }
+      >
         {left}
       </div>
 
       {/* RIGHT (40%) */}
-      <div className={"h-full min-h-0 lg:col-span-2 p-4 bg-gray-50 overflow-hidden " + rightClassName}>
-
+      <div
+        className={
+          "min-h-0 lg:col-span-2 bg-gray-50 " +
+          // responsive padding
+          "p-3 sm:p-4 " +
+          // allow scrolling instead of clipping
+          "overflow-auto " +
+          rightClassName
+        }
+      >
         {right}
       </div>
     </div>

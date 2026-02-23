@@ -1,11 +1,10 @@
+//components\dashboard\EditableSection.tsx
 "use client"
 
 import Section from "@/components/common/Section"
 import YesNo from "@/components/common/YesNo"
 import InputField from "@/components/common/InputField"
 import BulletOptions from "@/components/common/BulletOptions"
-
-
 
 type ImageItem = {
   createdAt: string
@@ -41,23 +40,23 @@ export default function EditableSection({
   return (
     <Section title="Editable" defaultOpen={true}>
       {/* Planting date */}
-      <InputField
-        label="Planting Date"
-        type="date"
-        disabled={disabled}
-        value={(current.createdAt ?? "").split("T")[0]}
-        onChange={(v) =>
-          updateField(
-            "createdAt",
-            v
-              ? new Date(v + "T00:00:00Z").toISOString()
-              : new Date().toISOString()
-          )
-        }
-      />
+      <div className="w-full sm:w-52">
+        <InputField
+          label="Planting Date"
+          type="date"
+          disabled={disabled}
+          value={(current.createdAt ?? "").split("T")[0]}
+          onChange={(v) =>
+            updateField(
+              "createdAt",
+              v ? new Date(v + "T00:00:00Z").toISOString() : new Date().toISOString()
+            )
+          }
+        />
+      </div>
 
       {/* Pest / Disease detected */}
-      <div className="grid grid-cols-2 gap-2 mt-2">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2">
         <YesNo
           label="Pest Detected"
           value={!!current.pestDetected}
@@ -85,7 +84,7 @@ export default function EditableSection({
       </div>
 
       {/* Gold standard */}
-      <div className="mt-6 pt-4 border-t">
+      <div className="mt-3 sm:mt-6 pt-3 sm:pt-4 border-t">
         <YesNo
           label="Gold Standard"
           value={!!current.isGoldStandard}
@@ -95,7 +94,7 @@ export default function EditableSection({
       </div>
 
       {/* Crop stage */}
-      <div className="mt-4">
+      <div className="mt-2 sm:mt-4">
         <BulletOptions
           label="Crop Stage"
           value={current.cropStage ?? ""}
@@ -107,7 +106,7 @@ export default function EditableSection({
 
       {/* Pest stage (only if pest detected) */}
       {current.pestDetected && (
-        <div className="mt-4 pl-4 border-l">
+        <div className="mt-2 sm:mt-4 pl-2 sm:pl-4 border-l">
           <BulletOptions
             label="Pest Stage"
             value={current.pestStage ?? ""}
@@ -120,7 +119,7 @@ export default function EditableSection({
 
       {/* Pest name (manual, only if pest detected) */}
       {current.pestDetected && (
-        <div className="mt-4 pl-4 border-l">
+        <div className="mt-2 sm:mt-4 pl-2 sm:pl-4 border-l">
           <InputField
             label="Pest Name"
             type="text"
@@ -134,7 +133,7 @@ export default function EditableSection({
 
       {/* Disease name (manual, only if disease detected) */}
       {current.diseaseDetected && (
-        <div className="mt-4 pl-4 border-l">
+        <div className="mt-2 sm:mt-4 pl-2 sm:pl-4 border-l">
           <InputField
             label="Disease Name"
             type="text"
@@ -148,7 +147,7 @@ export default function EditableSection({
 
       {/* Remarks (optional) */}
       {"remarks" in current && (
-        <div className="mt-4">
+        <div className="mt-2 sm:mt-4">
           <InputField
             label="Remarks"
             type="text"

@@ -91,14 +91,6 @@ export default function ImageReviewer() {
     }
   }, [router])
 
-  if (!authChecked) {
-    return (
-      <main className="min-h-screen flex items-center justify-center bg-zinc-950 text-white">
-        <div className="text-lg">Checking session...</div>
-      </main>
-    )
-  }
-
   // ---------- STATE ----------
   const loggingOutRef = useRef(false)
   const [nextCursor, setNextCursor] = useState<string | null>(null)
@@ -205,15 +197,17 @@ export default function ImageReviewer() {
     }
   }
 
-  // initial + refetch when filters change
+  // initial + refetch when filters change (only after auth checked)
   useEffect(() => {
+    if (!authChecked) return
+
     setRefreshing(true)
     setNextCursor(null)
     setIndex(0)
 
     fetchPage(null, false).finally(() => setRefreshing(false))
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filters])
+  }, [filters, authChecked])
 
   function updateField<K extends keyof ImageItem>(field: K, value: ImageItem[K]) {
     if (editable) setDirty(true)
@@ -382,7 +376,7 @@ export default function ImageReviewer() {
   }
 
   function onPointerDown(e: React.PointerEvent) {
-    ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
+    ; (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
     dragRef.current.active = true
     dragRef.current.startX = e.clientX
     dragRef.current.startY = e.clientY
@@ -419,10 +413,19 @@ export default function ImageReviewer() {
     }
   }, [index, images])
 
+  // ✅ no early return => hooks order stays stable
+  if (!authChecked) {
+    return (
+      <main className="min-h-screen flex items-center justify-center bg-zinc-950 text-white">
+        <div className="text-lg">Checking session...</div>
+      </main>
+    )
+  }
+
   return (
-    <main className="h-dvh overflow-hidden bg-zinc-950 text-zinc-100">
+    <main className="min-h-dvh overflow-x-hidden bg-zinc-950 text-zinc-100">
       <div className="h-full flex flex-col">
-        <div className="shrink-0 px-6 pt-4">
+        <div className="shrink-0 px-4 sm:px-6 lg:px-8 pt-4">
           <h3 className="text-2xl font-bold text-center tracking-tight">
             <span className="text-white">Image Label</span>{" "}
             <span className="text-green-700/80">Reviewer</span>
@@ -430,9 +433,9 @@ export default function ImageReviewer() {
         </div>
 
         {/* FILTER BAR */}
-        <div className="shrink-0 px-10 pt-3">
-          <div className="max-w-400 mx-auto">
-            <div className="bg-green-700/80 backdrop-blur border border-white/10 rounded px-3 py-2 flex flex-wrap items-center gap-3 text-xs">
+        <div className="shrink-0 px-4 sm:px-6 lg:px-8 pt-3">
+          <div className="max-w-screen-2xl mx-auto">
+            <div className="bg-green-700/80 backdrop-blur border border-white/10 rounded px-3 py-2 flex flex-wrap items-center gap-3 text-xs overflow-x-auto">
               <div className="flex items-center">
                 <img
                   src="https://res.cloudinary.com/dgwhmqdhr/image/upload/v1769143824/annam-white-with-icon_cp78pb.png"
@@ -441,7 +444,7 @@ export default function ImageReviewer() {
                 />
               </div>
 
-              <div className="ml-auto flex flex-wrap items-center gap-3">
+              <div className="ml-0 sm:ml-auto flex flex-wrap items-center gap-3 w-full sm:w-auto">
                 <div className="flex items-center gap-2">
                   <span className="text-white">Crop</span>
                   <select
@@ -545,8 +548,8 @@ export default function ImageReviewer() {
         </div>
 
         {/* 60:40 layout */}
-        <div className="flex-1 min-h-0 px-10 pb-4 pt-3">
-          <div className="h-full min-h-0 max-w-400 mx-auto">
+        <div className="flex-1 min-h-0 px-4 sm:px-6 lg:px-8 pb-4 pt-3">
+          <div className="h-full min-h-0 max-w-screen-2xl mx-auto">
             <DashboardLayout
               left={
                 <ImageCanvas
@@ -591,11 +594,10 @@ export default function ImageReviewer() {
       </div>
 
       {toast && (
-        <div className="fixed bottom-6 right-6 z-50">
+        <div className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-50">
           <div
-            className={`px-5 py-3 rounded-lg shadow-lg text-white text-sm transition-all duration-300 ${
-              toast.type === "success" ? "bg-green-600" : "bg-red-600"
-            }`}
+            className={`px-5 py-3 rounded-lg shadow-lg text-white text-sm transition-all duration-300 ${toast.type === "success" ? "bg-green-600" : "bg-red-600"
+              }`}
           >
             {toast.message}
           </div>

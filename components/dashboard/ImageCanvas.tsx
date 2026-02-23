@@ -39,7 +39,6 @@ export default function ImageCanvas({
   onPointerMove,
   onPointerUp,
 
-  // ✅ NEW: navigation controls
   goPrev,
   goNext,
   canPrev,
@@ -69,14 +68,14 @@ export default function ImageCanvas({
 }) {
   if (!current) {
     return (
-      <div className="w-full h-full flex items-center justify-center text-white/70">
+      <div className="w-full h-full min-h-0 flex items-center justify-center text-white/70">
         No image selected
       </div>
     )
   }
 
   return (
-    <>
+    <div className="w-full h-full min-h-0 relative">
       {/* Zoom UI */}
       <div className="absolute top-3 left-3 z-10 flex gap-2">
         <button
@@ -116,10 +115,9 @@ export default function ImageCanvas({
         Drag to pan • Wheel to zoom • ←/→ navigate • E edit • S save
       </div>
 
-
-      {/* Image viewport */}
+      {/* Image viewport (fills parent) */}
       <div
-        className="w-full h-[75vh] flex items-center justify-center overflow-hidden relative group"
+        className="w-full h-full min-h-0 flex items-center justify-center overflow-hidden relative group"
         onWheel={onWheelZoom}
         style={{ touchAction: "none" }}
       >
@@ -129,6 +127,7 @@ export default function ImageCanvas({
             Loading image…
           </div>
         )}
+
         {/* Side Navigation Buttons (show on hover) */}
         <button
           type="button"
@@ -162,14 +161,12 @@ export default function ImageCanvas({
           ▶
         </button>
 
-
         <div
-          className="select-none z-10 w-full h-full relative"
+          className="select-none z-10 w-full h-full min-h-0 relative"
           onPointerDown={onPointerDown}
           onPointerMove={onPointerMove}
           onPointerUp={onPointerUp}
           onClick={(e) => {
-            // if user is dragging, ignore clicks
             if (dragActive) return
 
             const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect()
@@ -203,13 +200,13 @@ export default function ImageCanvas({
                   alt="crop"
                   loading="eager"
                   decoding="async"
-                  className="max-h-[75vh] object-contain pointer-events-none"
+                  className="max-h-full max-w-full object-contain pointer-events-none"
                 />
               </motion.div>
             )}
           </AnimatePresence>
         </div>
       </div>
-    </>
+    </div>
   )
 }

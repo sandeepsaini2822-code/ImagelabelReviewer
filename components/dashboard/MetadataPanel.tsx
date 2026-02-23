@@ -6,8 +6,6 @@ import Section from "@/components/common/Section"
 import YesNo from "@/components/common/YesNo"
 import InputField from "@/components/common/InputField"
 import BulletOptions from "@/components/common/BulletOptions"
-import ReadOnly from "@/components/common/ReadOnly"
-
 
 type ImageItem = {
   key: string
@@ -47,7 +45,6 @@ export default function MetadataPanel({
   goPrev,
   goNext,
 
-  // Optional: pass these if you want exact same keyboard hints / disable logic
   showMoreHint = true,
 }: {
   current: ImageItem | null
@@ -68,24 +65,23 @@ export default function MetadataPanel({
   showMoreHint?: boolean
 }) {
   const disabled = !editable || saving
+
   if (!current) {
     return (
-      <div className="lg:col-span-2 p-4 text-gray-800 bg-gray-50 h-full flex items-center justify-center">
+      <div className="lg:col-span-2 p-3 sm:p-4 text-gray-800 bg-gray-50 h-full flex items-center justify-center">
         <div className="text-sm text-gray-500">Loading images…</div>
       </div>
     )
   }
 
-
-  // Options (edit these to match your exact enums)
   const CROP_STAGE_OPTIONS = ["Early", "Vegetative", "Reproductive", "Maturity"]
   const PEST_STAGE_OPTIONS = ["Egg", "Larva", "Pupa", "Adult"]
 
   return (
-    <div className="lg:col-span-2 p-4 text-gray-800 bg-gray-50 h-full flex flex-col">
+    <div className="lg:col-span-2 p-3 sm:p-4 text-gray-800 bg-gray-50 h-full flex flex-col">
       {/* Header */}
-      <div className="sticky top-0 z-20 bg-gray-50 pb-3">
-        <div className="flex justify-between items-center">
+      <div className="pb-2 sm:pb-3">
+        <div className="flex flex-wrap justify-between items-center gap-2">
           <h2 className="text-black font-bold">Metadata</h2>
 
           {!editable ? (
@@ -121,42 +117,37 @@ export default function MetadataPanel({
         <div className="mt-1 text-xs text-gray-500">
           Image {Math.min(index + 1, total)} / {total}
           {showMoreHint && nextCursor && (
-            <div className="text-xs text-gray-400 mb-1">More images available…</div>
+            <div className="text-xs text-gray-400 mt-0.5">More images available…</div>
           )}
         </div>
       </div>
 
-      {/* Farmer | Crop | Location - Inline Header */}
+      {/* Farmer | Crop | Location */}
       <div className="mt-1 px-3 py-1 bg-white border rounded text-sm text-gray-700">
-        <div className="flex flex-wrap items-center gap-4">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
           <span>
-            <span className="font-semibold text-gray-900">Farmer:</span>{" "}
-            {current.farmer || "-"}
+            <span className="font-semibold text-gray-900">Farmer:</span> {current.farmer || "-"}
           </span>
 
           <span className="text-gray-300">|</span>
 
           <span>
-            <span className="font-semibold text-gray-900">Crop:</span>{" "}
-            {current.crop || "-"}
+            <span className="font-semibold text-gray-900">Crop:</span> {current.crop || "-"}
           </span>
 
           <span className="text-gray-300">|</span>
 
           <span>
-            <span className="font-semibold text-gray-900">Location:</span>{" "}
-            {current.weatherLocation || "-"}
+            <span className="font-semibold text-gray-900">Location:</span> {current.weatherLocation || "-"}
           </span>
         </div>
       </div>
 
-
       {/* EDITABLE */}
       <Section title="Editable" defaultOpen={true}>
-
-        <div className="flex flex-col h-full justify-between gap-1.5">
-
-          <div className="w-52 mb-1 mt-0.5"> {/* ✅ small width (adjust: w-44 / w-56) */}
+        <div className="flex flex-col h-full justify-between gap-2 sm:gap-3">
+          {/* Planting date */}
+          <div className="w-full sm:w-52">
             <InputField
               label="Planting Date"
               type="date"
@@ -166,18 +157,15 @@ export default function MetadataPanel({
             />
           </div>
 
-
-
-          <div className="grid grid-cols-3 gap-2">
+          {/* Yes/No row */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
             <YesNo
               label="Pest Detected"
               value={!!current.pestDetected}
               disabled={disabled}
               onChange={(v) => {
                 updateField("pestDetected", v)
-
                 if (!v) {
-                  // ✅ clear & save as empty when pest = No
                   updateField("pestName", "")
                   updateField("pestStage", "")
                 }
@@ -190,9 +178,7 @@ export default function MetadataPanel({
               disabled={disabled}
               onChange={(v) => {
                 updateField("diseaseDetected", v)
-
                 if (!v) {
-                  // ✅ clear & save as empty when disease = No
                   updateField("diseaseName", "")
                 }
               }}
@@ -206,9 +192,7 @@ export default function MetadataPanel({
             />
           </div>
 
-
-
-          {/* Crop Stage (always visible) */}
+          {/* Options */}
           <BulletOptions
             label="Crop Stage"
             disabled={disabled}
@@ -217,41 +201,37 @@ export default function MetadataPanel({
             onChange={(v) => updateField("cropStage", v)}
           />
 
-          {/* Pest Stage (always visible, but locked when pestDetected = false) */}
           <BulletOptions
             label="Pest Stage"
-            disabled={disabled || !current.pestDetected}   // ✅ locked if pestDetected = false
+            disabled={disabled || !current.pestDetected}
             value={current.pestStage ?? ""}
             options={PEST_STAGE_OPTIONS}
             onChange={(v) => updateField("pestStage", v)}
           />
 
-          <div className="mt-4">
+          <div className="mt-2 sm:mt-3">
             <InputField
               label="Pest Name"
               type="text"
-              disabled={disabled || !current.pestDetected} // ✅ locked if pestDetected = false
+              disabled={disabled || !current.pestDetected}
               value={current.pestName ?? ""}
               onChange={(v) => updateField("pestName", v)}
               placeholder="Enter pest name (e.g., Fall Armyworm)"
             />
           </div>
 
-          <div className="mt-4">
+          <div className="mt-2 sm:mt-3">
             <InputField
               label="Disease Name"
               type="text"
-              disabled={disabled || !current.diseaseDetected} // ✅ locked if diseaseDetected = false
+              disabled={disabled || !current.diseaseDetected}
               value={current.diseaseName ?? ""}
               onChange={(v) => updateField("diseaseName", v)}
               placeholder="Enter disease name (e.g., Leaf blight)"
             />
           </div>
 
-
-
-          {/* Optional remarks (if you want it always visible) */}
-          <div className="mt-4">
+          <div className="mt-2 sm:mt-3">
             <InputField
               label="Remarks"
               type="text"
@@ -261,31 +241,27 @@ export default function MetadataPanel({
               placeholder="Optional notes"
             />
           </div>
-      
 
-      {/* Navigation */}
-      <div className="flex justify-between mt-1">
-        <button
-          type="button"
-          disabled={index === 0 || saving}
-          onClick={goPrev}
-          className="px-3 py-1 border rounded disabled:opacity-40 text-sm bg-white"
-        >
-          ◀ Prev (←)
-        </button>
+          {/* Navigation */}
+          <div className="flex justify-between mt-2 sm:mt-3">
+            <button
+              type="button"
+              disabled={index === 0 || saving}
+              onClick={goPrev}
+              className="px-3 py-1 border rounded disabled:opacity-40 text-sm bg-white"
+            >
+              ◀ Prev (←)
+            </button>
 
-        <button
-          type="button"
-          disabled={(index >= total - 1 && !nextCursor) || saving}
-          onClick={goNext}
-          className="px-3 py-1 border rounded disabled:opacity-40 text-sm bg-white"
-        >
-          Next (→) ▶
-        </button>
-
-      </div>
-
-
+            <button
+              type="button"
+              disabled={(index >= total - 1 && !nextCursor) || saving}
+              onClick={goNext}
+              className="px-3 py-1 border rounded disabled:opacity-40 text-sm bg-white"
+            >
+              Next (→) ▶
+            </button>
+          </div>
         </div>
       </Section>
     </div>
