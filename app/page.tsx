@@ -72,24 +72,32 @@ export default function ImageReviewer() {
   // ---------- AUTH GATE ----------
   const [authChecked, setAuthChecked] = useState(false)
 
-  useEffect(() => {
-    let alive = true
+ useEffect(() => {
+  let alive = true
 
-    fetch("/api/auth/ping", { credentials: "include", cache: "no-store" })
-      .then((res) => {
-        if (!alive) return
-        if (!res.ok) router.replace("/login")
-        else setAuthChecked(true)
-      })
-      .catch(() => {
-        if (!alive) return
+  fetch("/api/auth/me", { credentials: "include", cache: "no-store" })
+    .then(async (res) => {
+      if (!alive) return
+
+      if (!res.ok) {
+        // clear expired cookie server-side
+        await fetch("/logout", { method: "POST", credentials: "include" }).catch(() => null)
         router.replace("/login")
-      })
+        return
+      }
 
-    return () => {
-      alive = false
-    }
-  }, [router])
+      setAuthChecked(true)
+    })
+    .catch(async () => {
+      if (!alive) return
+      await fetch("/logout", { method: "POST", credentials: "include" }).catch(() => null)
+      router.replace("/login")
+    })
+
+  return () => {
+    alive = false
+  }
+}, [router])
 
   // ---------- STATE ----------
   const loggingOutRef = useRef(false)
