@@ -38,7 +38,7 @@ export default function EditableSection({
   const PEST_STAGE_OPTIONS = ["EGG", "LARVA", "PUPA", "ADULT"]
 
   return (
-    <Section title="Editable" defaultOpen={true}>
+    <Section title="Editable" >
       {/* Planting date */}
       <div className="w-full sm:w-52">
         <InputField

@@ -1,109 +1,184 @@
-//app\api\images\route.ts
-import { NextResponse } from "next/server";
-import { DynamoDBClient, ScanCommand, QueryCommand } from "@aws-sdk/client-dynamodb";
+// app/api/images/route.ts
+import { NextResponse } from "next/server"
+import { DynamoDBClient, ScanCommand, QueryCommand } from "@aws-sdk/client-dynamodb"
 import { S3Client, GetObjectCommand } from "@aws-sdk/client-s3"
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner"
+import { unmarshall } from "@aws-sdk/util-dynamodb"
 
-import { unmarshall } from "@aws-sdk/util-dynamodb";
+const region = process.env.AWS_REGION!
+const bucket = process.env.S3_BUCKET_NAME!
+const table = process.env.DYNAMO_TABLE_NAME!
 
-const region = process.env.AWS_REGION!;
-
-const bucket = process.env.S3_BUCKET_NAME!;
-const table = process.env.DYNAMO_TABLE_NAME!;
-
-const db = new DynamoDBClient({ region });
-const s3 = new S3Client({ region });
+const db = new DynamoDBClient({ region })
+const s3 = new S3Client({ region })
 
 // ----- cursor helpers -----
 function encodeCursor(lastKey: any) {
-  if (!lastKey) return null;
-  return Buffer.from(JSON.stringify(lastKey)).toString("base64url");
+  if (!lastKey) return null
+  return Buffer.from(JSON.stringify(lastKey)).toString("base64url")
 }
 function decodeCursor(cursor: string | null) {
-  if (!cursor) return undefined;
+  if (!cursor) return undefined
   try {
-    return JSON.parse(Buffer.from(cursor, "base64url").toString("utf8"));
+    return JSON.parse(Buffer.from(cursor, "base64url").toString("utf8"))
   } catch {
-    return undefined;
+    return undefined
   }
+}
+
+function normalizeStr(v: any) {
+  return (v ?? "").toString().trim()
+}
+function normalizeLower(v: any) {
+  return normalizeStr(v).toLowerCase()
 }
 
 export async function GET(req: Request) {
   try {
-    const url = new URL(req.url);
+    const url = new URL(req.url)
 
     // pagination
-    const limit = Math.min(Number(url.searchParams.get("limit") ?? "50"), 200);
-    const cursor = url.searchParams.get("cursor");
-    const ExclusiveStartKey = decodeCursor(cursor);
+    const limit = Math.min(Number(url.searchParams.get("limit") ?? "50"), 200)
+    const cursor = url.searchParams.get("cursor")
+    const ExclusiveStartKey = decodeCursor(cursor)
 
     // filters
-    const cropRaw = url.searchParams.get("crop"); // from UI
-    const crop = cropRaw ? cropRaw.trim().toLowerCase() : null; // normalize
+    const cropRaw = url.searchParams.get("crop")
+    const crop = cropRaw ? normalizeLower(cropRaw) : null
 
-    const pest = url.searchParams.get("pestDetected"); // "true" | "false"
-    const disease = url.searchParams.get("diseaseDetected"); // "true" | "false"
-    const gold = url.searchParams.get("goldStandard"); // "true" | "false"
+    const farmerRaw = url.searchParams.get("farmer")
+    const farmer = farmerRaw ? normalizeStr(farmerRaw) : null
 
-    // FilterExpression for boolean filters
+    const pest = url.searchParams.get("pestDetected") // "true" | "false"
+    const disease = url.searchParams.get("diseaseDetected") // "true" | "false"
+    const gold = url.searchParams.get("goldStandard") // "true" | "false"
+
+    const usingFarmerQuery = !!farmer && farmer !== "all"
+    const usingCropQuery = !!crop && crop !== "all"
+
+    // IMPORTANT:
+    // - farmer/crop go in KeyConditionExpression (when using their GSI)
+    // - only NON-key filters go in FilterExpression
     const filterParts: string[] = []
     const exprNames: Record<string, string> = {}
     const exprValues: Record<string, any> = {}
 
+    // pest filter
     if (pest === "true" || pest === "false") {
       filterParts.push("#pp = :pp")
       exprNames["#pp"] = "pestPresent"
       exprValues[":pp"] = { BOOL: pest === "true" }
     }
 
+    // disease filter
     if (disease === "true" || disease === "false") {
       filterParts.push("#dp = :dp")
       exprNames["#dp"] = "diseasePresent"
       exprValues[":dp"] = { BOOL: disease === "true" }
     }
 
+    // gold filter
     if (gold === "true") {
-      // only items explicitly marked true
       filterParts.push("#gs = :gsT")
       exprNames["#gs"] = "isGoldStandard"
       exprValues[":gsT"] = { BOOL: true }
     } else if (gold === "false") {
-      // treat missing as false
       filterParts.push("(attribute_not_exists(#gs) OR #gs = :gsF)")
       exprNames["#gs"] = "isGoldStandard"
       exprValues[":gsF"] = { BOOL: false }
     }
 
+    let result: any
+    let rawUnmarshalled: any[] | null = null // used only for farmer+crop workaround
 
+    // ✅ CASE 1: Farmer selected (and optionally crop)
+    if (usingFarmerQuery) {
+      // DynamoDB applies Limit BEFORE FilterExpression.
+      // If crop is also selected, we must keep fetching pages until we collect enough matches.
+      if (usingCropQuery) {
+        const collected: any[] = []
+        let startKey: any = ExclusiveStartKey
+        const HARD_PAGE = 200
 
-    let result;
+        do {
+          const page = await db.send(
+            new QueryCommand({
+              TableName: table,
+              IndexName: "GSI_FarmerNameTimestamp",
+              KeyConditionExpression: "#fn = :fn",
+              ExpressionAttributeNames: {
+                "#fn": "farmerName",
+                ...exprNames,
+              },
+              ExpressionAttributeValues: {
+                ":fn": { S: farmer! },
+                ...exprValues,
+              },
+              Limit: HARD_PAGE,
+              ExclusiveStartKey: startKey,
+              ScanIndexForward: false,
+              ...(filterParts.length ? { FilterExpression: filterParts.join(" AND ") } : {}),
+            })
+          )
 
-    const usingCropQuery = !!crop && crop !== "all";
+          const pageData = (page.Items ?? []).map((it) => unmarshall(it))
+          const cropMatches = pageData.filter((d) => normalizeLower(d.cropName) === crop)
 
-    if (usingCropQuery) {
-      // ✅ Query using GSI_CropCreatedAt (YOU MUST CREATE THIS INDEX)
+          collected.push(...cropMatches)
+          startKey = page.LastEvaluatedKey
+
+          if (collected.length >= limit) break
+        } while (startKey)
+
+        rawUnmarshalled = collected.slice(0, limit)
+        result = { LastEvaluatedKey: startKey }
+      } else {
+        // farmer only
+        result = await db.send(
+          new QueryCommand({
+            TableName: table,
+            IndexName: "GSI_FarmerNameTimestamp",
+            KeyConditionExpression: "#fn = :fn",
+            ExpressionAttributeNames: {
+              "#fn": "farmerName",
+              ...exprNames,
+            },
+            ExpressionAttributeValues: {
+              ":fn": { S: farmer! },
+              ...exprValues,
+            },
+            Limit: limit,
+            ExclusiveStartKey,
+            ScanIndexForward: false,
+            ...(filterParts.length ? { FilterExpression: filterParts.join(" AND ") } : {}),
+          })
+        )
+      }
+
+      // ✅ CASE 2: Crop selected (no farmer)
+    } else if (usingCropQuery) {
       result = await db.send(
         new QueryCommand({
           TableName: table,
-          IndexName: "GSI_CropNameTimestamp", // create this (step 2 below)
+          IndexName: "GSI_CropNameTimestamp",
           KeyConditionExpression: "#crop = :crop",
           ExpressionAttributeNames: {
             "#crop": "cropName",
             ...exprNames,
           },
           ExpressionAttributeValues: {
-            ":crop": { S: crop }, // crop already lowercased from UI
+            ":crop": { S: crop! },
             ...exprValues,
           },
           Limit: limit,
           ExclusiveStartKey,
-          ScanIndexForward: false, // newest first by timestamp
+          ScanIndexForward: false,
           ...(filterParts.length ? { FilterExpression: filterParts.join(" AND ") } : {}),
         })
-      );
+      )
 
+      // ✅ CASE 3: no farmer, no crop
     } else {
-      // ⛔ fallback Scan when crop=all (not scalable, but works)
       result = await db.send(
         new ScanCommand({
           TableName: table,
@@ -111,19 +186,21 @@ export async function GET(req: Request) {
           ExclusiveStartKey,
           ...(filterParts.length
             ? {
-              FilterExpression: filterParts.join(" AND "),
-              ExpressionAttributeNames: exprNames,
-              ExpressionAttributeValues: exprValues,
-            }
+                FilterExpression: filterParts.join(" AND "),
+                ExpressionAttributeNames: exprNames,
+                ExpressionAttributeValues: exprValues,
+              }
             : {}),
         })
-      );
+      )
     }
 
-    const items = (result.Items ?? []).map((item) => {
-      const data: any = unmarshall(item);
+    // Convert result to array of unmarshalled objects
+    const dataRows: any[] =
+      rawUnmarshalled ??
+      (result?.Items ?? []).map((item: any) => unmarshall(item))
 
-      // In your new schema, `imageUrl` is actually the S3 key/path
+    const items = dataRows.map((data: any) => {
       const s3Key = data.imageUrl ?? data.s3Key ?? ""
 
       return {
@@ -145,35 +222,27 @@ export async function GET(req: Request) {
         pestStage: data.pestStage ?? "",
 
         diseaseName: data.diseaseName ?? "",
+        diseaseStage: data.diseaseStage ?? "", // ✅ NEW FIELD
         cropStage: data.cropStage ?? "",
 
         remarks: data.remarks ?? "",
 
-        s3Key, // ✅ use the variable (not overwrite)
+        s3Key,
       }
+    })
 
-
-
-
-    });
-    const EXPIRES_SECONDS = 60 * 60 // 1 hour
+    const EXPIRES_SECONDS = 60 * 60
 
     const images = await Promise.all(
       items.map(async (img) => {
-        if (!img.s3Key) {
-          return { ...img, imageUrl: "" }
-        }
+        if (!img.s3Key) return { ...img, imageUrl: "" }
 
         try {
           const signedUrl = await getSignedUrl(
             s3,
-            new GetObjectCommand({
-              Bucket: bucket,
-              Key: img.s3Key,
-            }),
+            new GetObjectCommand({ Bucket: bucket, Key: img.s3Key }),
             { expiresIn: EXPIRES_SECONDS }
           )
-
           return { ...img, imageUrl: signedUrl }
         } catch (e) {
           console.error("SIGN URL ERROR:", img.s3Key, e)
@@ -182,13 +251,21 @@ export async function GET(req: Request) {
       })
     )
 
-
     return NextResponse.json({
       items: images,
-      nextCursor: encodeCursor(result.LastEvaluatedKey),
-    });
-  } catch (error) {
-    console.error("IMAGES ERROR:", error);
-    return NextResponse.json({ error: "Failed to fetch images" }, { status: 500 });
+      nextCursor: encodeCursor(result?.LastEvaluatedKey),
+    })
+  } catch (error: any) {
+    console.error("IMAGES ERROR:", error)
+
+    return NextResponse.json(
+      {
+        error: "Failed to fetch images",
+        message: error?.message ?? String(error),
+        name: error?.name ?? "UnknownError",
+        meta: error?.$metadata ?? null,
+      },
+      { status: 500 }
+    )
   }
 }

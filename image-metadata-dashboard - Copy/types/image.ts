@@ -13,7 +13,7 @@ export type ImageItem = {
   pestDetected: boolean
   diseaseDetected: boolean
   isGoldStandard: boolean
-
+  diseaseStage?: string
   pestName?: string
   pestStage?: string
   diseaseName?: string

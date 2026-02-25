@@ -106,13 +106,15 @@ export default function ImageCanvas({
       {/* Crop overlay (top-right) */}
       {current.crop && (
         <div className="absolute top-5 right-4 z-10 bg-black/60 backdrop-blur text-white px-3 py-1 rounded text-sm font-semibold">
-          {current.crop}
+          {current.crop
+            ? current.crop.charAt(0).toUpperCase() + current.crop.slice(1).toLowerCase()
+            : ""}
         </div>
       )}
 
       {/* Drag hint */}
       <div className="absolute bottom-6 left-3 z-10 text-white/70 text-xs">
-        Drag to pan • Wheel to zoom • ←/→ navigate • E edit • S save
+        Drag to pan • Wheel to zoom • ←/→ navigate
       </div>
 
       {/* Image viewport (fills parent) */}

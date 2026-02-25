@@ -18,7 +18,7 @@ export default function ReadOnlySection({
   current: ImageItem
 }) {
   return (
-    <Section title="Not editable" defaultOpen={false}>
+    <Section title="Not editable">
       <div className="flex flex-col gap-1 sm:gap-2">
         <ReadOnly label="Farmer" value={current.farmer || "-"} />
         <ReadOnly label="Crop" value={current.crop || "-"} />
