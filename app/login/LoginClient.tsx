@@ -13,7 +13,7 @@ export default function LoginClient() {
   const [signingIn, setSigningIn] = useState(false)
   const ran = useRef(false)
 
-  // ✅ If coming from logout, show message briefly then clean URL
+  // ✅ If coming from logout, show message briefly then clean URL (do NOT auto-login)
   useEffect(() => {
     if (!loggedOut) return
     const t = setTimeout(() => {
@@ -22,21 +22,28 @@ export default function LoginClient() {
     return () => clearTimeout(t)
   }, [loggedOut, router])
 
-  // ✅ Session check
+  // ✅ session check (but NEVER block the sign-in button forever)
   useEffect(() => {
     if (ran.current) return
     ran.current = true
 
     fetch("/api/auth/ping", { credentials: "include", cache: "no-store" })
       .then((res) => {
-        if (res.ok) {
-          router.replace("/")
-        } else {
-          setChecking(false)
-        }
+        if (res.ok) router.replace("/")
+        else setChecking(false)
       })
       .catch(() => setChecking(false))
+      .finally(() => {
+        // extra safety: ensure button becomes clickable
+        setChecking(false)
+      })
   }, [router])
+
+  function goToCognito() {
+    setSigningIn(true)
+    // ✅ Full navigation (not Next router) so redirects to Cognito always work
+    window.location.assign("/auth/login")
+  }
 
   return (
     <main className="min-h-screen relative overflow-hidden bg-zinc-950 text-white">
@@ -49,7 +56,7 @@ export default function LoginClient() {
 
       <div className="relative z-10 min-h-screen flex items-center justify-center p-6">
         <div className="w-full max-w-md">
-          {/* Header */}
+          {/* Brand header */}
           <div className="mb-6 text-center">
             <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-zinc-200">
               <span className="h-2 w-2 rounded-full bg-green-500 shadow-[0_0_16px_rgba(34,197,94,0.6)]" />
@@ -60,7 +67,6 @@ export default function LoginClient() {
               <span className="text-white">Image Label</span>{" "}
               <span className="text-green-400">Reviewer</span>
             </h1>
-
             <p className="mt-2 text-sm text-zinc-300">
               Sign in to review and correct pest/disease labels.
             </p>
@@ -89,21 +95,17 @@ export default function LoginClient() {
 
             <div className="my-5 h-px bg-white/10" />
 
-            {/* Sign In Button */}
+            {/* Button */}
             <button
-              disabled={checking || signingIn}
-              onClick={() => {
-                setSigningIn(true)
-                window.location.href = "/auth/login"   // 🔥 full redirect (no router)
+              // ✅ IMPORTANT: don't block sign-in while "checking"
+              disabled={signingIn}
+              onClick={(e) => {
+                e.preventDefault()
+                goToCognito()
               }}
               className="group w-full h-11 rounded-xl bg-green-600 hover:bg-green-500 active:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed transition flex items-center justify-center gap-2 font-medium shadow-[0_10px_30px_rgba(34,197,94,0.25)]"
             >
-              {checking ? (
-                <>
-                  <span className="h-4 w-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />
-                  Checking session…
-                </>
-              ) : signingIn ? (
+              {signingIn ? (
                 <>
                   <span className="h-4 w-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />
                   Redirecting…
@@ -119,8 +121,13 @@ export default function LoginClient() {
             </button>
 
             <p className="mt-4 text-xs text-zinc-400 leading-relaxed">
-              Having trouble signing in? Try opening in a private window or clear site cookies for{" "}
-              <span className="text-zinc-200">image-label-reviewer.vercel.app</span>.
+              If sign-in doesn’t open, directly visit{" "}
+              <span className="text-zinc-200">/auth/login</span> once to verify redirects.
+            </p>
+
+            {/* Optional tiny debug hint */}
+            <p className="mt-2 text-[11px] text-zinc-500">
+              Session check: {checking ? "checking…" : "ready"}
             </p>
           </div>
 
