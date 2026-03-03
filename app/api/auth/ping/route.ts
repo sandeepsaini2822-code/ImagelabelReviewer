@@ -1,3 +1,4 @@
+// app/api/auth/ping/route.ts
 import { NextResponse } from "next/server"
 import { cookies } from "next/headers"
 
@@ -9,4 +10,3 @@ export async function GET() {
   if (!token) return NextResponse.json({ ok: false }, { status: 401 })
   return NextResponse.json({ ok: true })
 }
-//app\api\auth\ping\route.ts

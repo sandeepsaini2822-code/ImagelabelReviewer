@@ -1,9 +1,12 @@
 import { NextResponse } from "next/server"
+import { Buffer } from "buffer"
+
+export const runtime = "nodejs"
 
 export async function GET(req: Request) {
   const url = new URL(req.url)
 
-  // Keep origin for where to send the browser back (same host user is on)
+  // Where to send browser after callback
   const origin = url.origin
 
   const err = url.searchParams.get("error")
@@ -16,7 +19,6 @@ export async function GET(req: Request) {
   const clientId = process.env.COGNITO_CLIENT_ID!
   const clientSecret = process.env.COGNITO_CLIENT_SECRET // optional
 
-  // ✅ Use your configured base URL for Cognito redirectUri
   // Must match Cognito Allowed callback URLs EXACTLY
   const baseUrl = process.env.APP_BASE_URL ?? origin
   const redirectUri = `${baseUrl}/auth/callback`
@@ -41,7 +43,8 @@ export async function GET(req: Request) {
   const tokens: any = await tokenRes.json().catch(() => null)
 
   if (!tokenRes.ok || !tokens?.id_token) {
-    return NextResponse.redirect(new URL("/login", origin))
+    // TEMP debug: helps you see status quickly
+    return NextResponse.redirect(new URL(`/login?error=token_${tokenRes.status}`, origin))
   }
 
   const idToken = tokens.id_token as string
@@ -49,7 +52,7 @@ export async function GET(req: Request) {
 
   const res = NextResponse.redirect(new URL("/", origin))
 
-  const isHttps = origin.startsWith("https://")
+  const isHttps = baseUrl.startsWith("https://")
 
   res.cookies.set(cookieName, idToken, {
     httpOnly: true,
