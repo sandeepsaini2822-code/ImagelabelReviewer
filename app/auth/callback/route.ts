@@ -1,27 +1,25 @@
-// app/auth/callback/route.ts
 import { NextResponse } from "next/server"
 
 export const dynamic = "force-dynamic"
 
 export async function GET(req: Request) {
   const url = new URL(req.url)
-  const origin = url.origin
+
+  const baseUrl = process.env.APP_BASE_URL!
+  const domain = process.env.COGNITO_DOMAIN!
+  const clientId = process.env.COGNITO_CLIENT_ID!
+  const clientSecret = process.env.COGNITO_CLIENT_SECRET! // you said you have it
 
   const err = url.searchParams.get("error")
   if (err) {
     console.error("Cognito returned error:", err, url.searchParams.toString())
-    return NextResponse.redirect(new URL("/login?error=oauth_error", origin))
+    return NextResponse.redirect(`${baseUrl}/login?error=${encodeURIComponent(err)}`)
   }
 
   const code = url.searchParams.get("code")
-  if (!code) return NextResponse.redirect(new URL("/login?error=no_code", origin))
+  if (!code) return NextResponse.redirect(`${baseUrl}/login?error=no_code`)
 
-  const domain = process.env.COGNITO_DOMAIN!
-  const clientId = process.env.COGNITO_CLIENT_ID!
-  const clientSecret = process.env.COGNITO_CLIENT_SECRET // optional
-  const baseUrl = process.env.APP_BASE_URL ?? origin
-
-  // MUST match Cognito Allowed callback URLs exactly
+  // MUST match Cognito Allowed callback URLs EXACTLY
   const redirectUri = `${baseUrl}/auth/callback`
 
   const tokenUrl = `${domain}/oauth2/token`
@@ -32,20 +30,19 @@ export async function GET(req: Request) {
   body.set("code", code)
   body.set("redirect_uri", redirectUri)
 
-  const headers: Record<string, string> = {
-    "Content-Type": "application/x-www-form-urlencoded",
-  }
+  const basic = Buffer.from(`${clientId}:${clientSecret}`).toString("base64")
 
-  // Use Basic auth only if you truly have a client secret enabled for this app client
-  if (clientSecret) {
-    const basic = Buffer.from(`${clientId}:${clientSecret}`).toString("base64")
-    headers["Authorization"] = `Basic ${basic}`
-  }
+  const tokenRes = await fetch(tokenUrl, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+      Authorization: `Basic ${basic}`,
+    },
+    body,
+  })
 
-  const tokenRes = await fetch(tokenUrl, { method: "POST", headers, body })
   const raw = await tokenRes.text()
 
-  // 🔥 LOG the real error from Cognito
   if (!tokenRes.ok) {
     console.error("TOKEN EXCHANGE FAILED", {
       status: tokenRes.status,
@@ -54,7 +51,7 @@ export async function GET(req: Request) {
       body: body.toString(),
       response: raw,
     })
-    return NextResponse.redirect(new URL(`/login?error=token_${tokenRes.status}`, origin))
+    return NextResponse.redirect(`${baseUrl}/login?error=token_${tokenRes.status}`)
   }
 
   let tokens: any = null
@@ -62,21 +59,21 @@ export async function GET(req: Request) {
     tokens = JSON.parse(raw)
   } catch {
     console.error("Token response not JSON:", raw)
-    return NextResponse.redirect(new URL(`/login?error=token_parse`, origin))
+    return NextResponse.redirect(`${baseUrl}/login?error=token_parse`)
   }
 
   if (!tokens?.id_token) {
     console.error("No id_token in response:", tokens)
-    return NextResponse.redirect(new URL(`/login?error=no_id_token`, origin))
+    return NextResponse.redirect(`${baseUrl}/login?error=no_id_token`)
   }
 
   const cookieName = process.env.AUTH_COOKIE_NAME ?? "agri_auth"
-  const res = NextResponse.redirect(new URL("/", origin))
-  const isHttps = origin.startsWith("https://")
+
+  const res = NextResponse.redirect(`${baseUrl}/`)
 
   res.cookies.set(cookieName, tokens.id_token, {
     httpOnly: true,
-    secure: isHttps,
+    secure: baseUrl.startsWith("https://"), // ✅ correct
     sameSite: "lax",
     path: "/",
     maxAge: 60 * 60 * 8,
