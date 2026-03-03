@@ -3,7 +3,7 @@ import { NextResponse } from "next/server"
 export async function GET(req: Request) {
   const url = new URL(req.url)
 
-  // Always use the current host (vercel domain / preview domain / localhost)
+  // Keep origin for where to send the browser back (same host user is on)
   const origin = url.origin
 
   const err = url.searchParams.get("error")
@@ -16,8 +16,10 @@ export async function GET(req: Request) {
   const clientId = process.env.COGNITO_CLIENT_ID!
   const clientSecret = process.env.COGNITO_CLIENT_SECRET // optional
 
-  // IMPORTANT: redirectUri must match what you configured in Cognito
-  const redirectUri = `${origin}/auth/callback`
+  // ✅ Use your configured base URL for Cognito redirectUri
+  // Must match Cognito Allowed callback URLs EXACTLY
+  const baseUrl = process.env.APP_BASE_URL ?? origin
+  const redirectUri = `${baseUrl}/auth/callback`
 
   const tokenUrl = `${domain}/oauth2/token`
   const body = new URLSearchParams()
@@ -30,8 +32,6 @@ export async function GET(req: Request) {
     "Content-Type": "application/x-www-form-urlencoded",
   }
 
-  // If your Cognito app client has a secret, keep this.
-  // If it does NOT have a secret, leave COGNITO_CLIENT_SECRET empty in Vercel.
   if (clientSecret) {
     const basic = Buffer.from(`${clientId}:${clientSecret}`).toString("base64")
     headers["Authorization"] = `Basic ${basic}`
@@ -49,7 +49,6 @@ export async function GET(req: Request) {
 
   const res = NextResponse.redirect(new URL("/", origin))
 
-  // secure should be true whenever site is https (Vercel + previews)
   const isHttps = origin.startsWith("https://")
 
   res.cookies.set(cookieName, idToken, {
