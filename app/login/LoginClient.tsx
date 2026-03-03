@@ -17,7 +17,7 @@ export default function LoginClient() {
   useEffect(() => {
     if (!loggedOut) return
     const t = setTimeout(() => {
-      router.replace("/login")
+     window.location.href = "/auth/login"
     }, 1200)
     return () => clearTimeout(t)
   }, [loggedOut, router])
