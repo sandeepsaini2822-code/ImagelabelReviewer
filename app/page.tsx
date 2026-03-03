@@ -100,7 +100,6 @@ export default function ImageReviewer() {
         if (!alive) return
 
         if (!res.ok) {
-          await fetch("/logout", { method: "POST", credentials: "include" }).catch(() => null)
           router.replace("/login")
           return
         }
@@ -109,7 +108,6 @@ export default function ImageReviewer() {
       })
       .catch(async () => {
         if (!alive) return
-        await fetch("/logout", { method: "POST", credentials: "include" }).catch(() => null)
         router.replace("/login")
       })
 
@@ -812,15 +810,9 @@ export default function ImageReviewer() {
                 </button>
 
                 <button
-                  onClick={async () => {
-                    setImages([])
-                    setNextCursor(null)
-
-                    const res = await fetch("/logout", { method: "POST", credentials: "include" })
-                    const data = await res.json().catch(() => null)
-
-                    if (data?.logoutUrl) window.location.href = data.logoutUrl
-                    else router.replace("/login")
+                  onClick={() => {
+                    // ✅ simplest + correct: call GET /logout which clears cookie + redirects to Cognito logout
+                    window.location.href = "/logout"
                   }}
                   className="h-8 px-3 rounded bg-red-900 text-white text-xs hover:bg-red-700"
                 >
