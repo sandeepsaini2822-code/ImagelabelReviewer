@@ -3,19 +3,18 @@ import { NextResponse } from "next/server"
 export async function GET(req: Request) {
   const url = new URL(req.url)
 
-  const err = url.searchParams.get("error")
-  if (err) {
-    return NextResponse.redirect(`${process.env.APP_BASE_URL}/login?error=${encodeURIComponent(err)}`)
-  }
-
-  const code = url.searchParams.get("code")
-  if (!code) return NextResponse.redirect(`${process.env.APP_BASE_URL}/login`)
-
+  const baseUrl = process.env.APP_BASE_URL! // https://imagelabel-reviewer.vercel.app
   const domain = process.env.COGNITO_DOMAIN!
   const clientId = process.env.COGNITO_CLIENT_ID!
-  const clientSecret = process.env.COGNITO_CLIENT_SECRET! // you said you have it
-  const baseUrl = process.env.APP_BASE_URL!
+  const clientSecret = process.env.COGNITO_CLIENT_SECRET! // you have it
 
+  const err = url.searchParams.get("error")
+  if (err) return NextResponse.redirect(`${baseUrl}/login?error=${encodeURIComponent(err)}`)
+
+  const code = url.searchParams.get("code")
+  if (!code) return NextResponse.redirect(`${baseUrl}/login?error=no_code`)
+
+  // MUST match Cognito callback URL EXACTLY
   const redirectUri = `${baseUrl}/auth/callback`
 
   const tokenUrl = `${domain}/oauth2/token`

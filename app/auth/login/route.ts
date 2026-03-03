@@ -3,7 +3,7 @@ import { NextResponse } from "next/server"
 export async function GET() {
   const domain = process.env.COGNITO_DOMAIN!
   const clientId = process.env.COGNITO_CLIENT_ID!
-  const baseUrl = process.env.APP_BASE_URL! // MUST be https://imagelabel-reviewer.vercel.app
+  const baseUrl = process.env.APP_BASE_URL! // https://imagelabel-reviewer.vercel.app
 
   const redirectUri = `${baseUrl}/auth/callback`
   const scope = "openid email profile"
@@ -15,5 +15,7 @@ export async function GET() {
     `&scope=${encodeURIComponent(scope)}` +
     `&redirect_uri=${encodeURIComponent(redirectUri)}`
 
-  return NextResponse.redirect(authUrl, { headers: { "Cache-Control": "no-store" } })
+  const res = NextResponse.redirect(authUrl)
+  res.headers.set("Cache-Control", "no-store")
+  return res
 }
