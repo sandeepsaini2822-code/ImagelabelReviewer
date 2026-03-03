@@ -3,7 +3,7 @@ import { cookies } from "next/headers"
 
 export async function GET() {
   const cookieName = process.env.AUTH_COOKIE_NAME ?? "agri_auth"
-  const store = await cookies()
+  const store = await cookies() // ✅ await is REQUIRED in your Next version
   const token = store.get(cookieName)?.value
 
   if (!token) return NextResponse.json({ ok: false }, { status: 401 })
