@@ -7,17 +7,13 @@ export async function GET() {
 
   const redirectUri = `${baseUrl}/auth/callback`
   const scope = "openid email profile"
-  const state = crypto.randomUUID()
 
   const authUrl =
     `${domain}/oauth2/authorize` +
     `?client_id=${encodeURIComponent(clientId)}` +
     `&response_type=code` +
     `&scope=${encodeURIComponent(scope)}` +
-    `&redirect_uri=${encodeURIComponent(redirectUri)}` +
-    `&state=${encodeURIComponent(state)}`
+    `&redirect_uri=${encodeURIComponent(redirectUri)}`
 
-  const res = NextResponse.redirect(authUrl)
-  res.headers.set("Cache-Control", "no-store")
-  return res
+  return NextResponse.redirect(authUrl, { headers: { "Cache-Control": "no-store" } })
 }

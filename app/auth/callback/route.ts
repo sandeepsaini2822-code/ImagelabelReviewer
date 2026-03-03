@@ -1,26 +1,21 @@
 import { NextResponse } from "next/server"
-import { Buffer } from "buffer"
-
-export const runtime = "nodejs"
 
 export async function GET(req: Request) {
   const url = new URL(req.url)
 
-  // Where to send browser after callback
-  const origin = url.origin
-
   const err = url.searchParams.get("error")
-  if (err) return NextResponse.redirect(new URL("/login", origin))
+  if (err) {
+    return NextResponse.redirect(`${process.env.APP_BASE_URL}/login?error=${encodeURIComponent(err)}`)
+  }
 
   const code = url.searchParams.get("code")
-  if (!code) return NextResponse.redirect(new URL("/login", origin))
+  if (!code) return NextResponse.redirect(`${process.env.APP_BASE_URL}/login`)
 
   const domain = process.env.COGNITO_DOMAIN!
   const clientId = process.env.COGNITO_CLIENT_ID!
-  const clientSecret = process.env.COGNITO_CLIENT_SECRET // optional
+  const clientSecret = process.env.COGNITO_CLIENT_SECRET! // you said you have it
+  const baseUrl = process.env.APP_BASE_URL!
 
-  // Must match Cognito Allowed callback URLs EXACTLY
-  const baseUrl = process.env.APP_BASE_URL ?? origin
   const redirectUri = `${baseUrl}/auth/callback`
 
   const tokenUrl = `${domain}/oauth2/token`
@@ -30,33 +25,29 @@ export async function GET(req: Request) {
   body.set("code", code)
   body.set("redirect_uri", redirectUri)
 
-  const headers: Record<string, string> = {
-    "Content-Type": "application/x-www-form-urlencoded",
-  }
+  const basic = Buffer.from(`${clientId}:${clientSecret}`).toString("base64")
 
-  if (clientSecret) {
-    const basic = Buffer.from(`${clientId}:${clientSecret}`).toString("base64")
-    headers["Authorization"] = `Basic ${basic}`
-  }
+  const tokenRes = await fetch(tokenUrl, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+      Authorization: `Basic ${basic}`,
+    },
+    body,
+  })
 
-  const tokenRes = await fetch(tokenUrl, { method: "POST", headers, body })
   const tokens: any = await tokenRes.json().catch(() => null)
 
   if (!tokenRes.ok || !tokens?.id_token) {
-    // TEMP debug: helps you see status quickly
-    return NextResponse.redirect(new URL(`/login?error=token_${tokenRes.status}`, origin))
+    return NextResponse.redirect(`${baseUrl}/login?error=token_${tokenRes.status}`)
   }
 
-  const idToken = tokens.id_token as string
   const cookieName = process.env.AUTH_COOKIE_NAME ?? "agri_auth"
 
-  const res = NextResponse.redirect(new URL("/", origin))
-
-  const isHttps = baseUrl.startsWith("https://")
-
-  res.cookies.set(cookieName, idToken, {
+  const res = NextResponse.redirect(`${baseUrl}/`)
+  res.cookies.set(cookieName, tokens.id_token, {
     httpOnly: true,
-    secure: isHttps,
+    secure: true,
     sameSite: "lax",
     path: "/",
     maxAge: 60 * 60 * 8,
