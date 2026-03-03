@@ -17,20 +17,23 @@ export default function LoginClient() {
   useEffect(() => {
     if (!loggedOut) return
     const t = setTimeout(() => {
-     window.location.href = "/auth/login"
+      router.replace("/login")
     }, 1200)
     return () => clearTimeout(t)
   }, [loggedOut, router])
 
-  // ✅ session check
+  // ✅ Session check
   useEffect(() => {
     if (ran.current) return
     ran.current = true
 
     fetch("/api/auth/ping", { credentials: "include", cache: "no-store" })
       .then((res) => {
-        if (res.ok) router.replace("/")
-        else setChecking(false)
+        if (res.ok) {
+          router.replace("/")
+        } else {
+          setChecking(false)
+        }
       })
       .catch(() => setChecking(false))
   }, [router])
@@ -41,13 +44,12 @@ export default function LoginClient() {
       <div className="pointer-events-none absolute inset-0">
         <div className="absolute -top-40 -left-40 h-96 w-96 rounded-full bg-green-600/20 blur-3xl" />
         <div className="absolute -bottom-40 -right-40 h-128 w-lg rounded-full bg-emerald-400/10 blur-3xl" />
-        {/* subtle grid */}
         <div className="absolute inset-0 opacity-10 bg-[linear-gradient(to_right,rgba(255,255,255,0.18)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.18)_1px,transparent_1px)] bg-size-[52px_52px]" />
       </div>
 
       <div className="relative z-10 min-h-screen flex items-center justify-center p-6">
         <div className="w-full max-w-md">
-          {/* Brand header */}
+          {/* Header */}
           <div className="mb-6 text-center">
             <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-zinc-200">
               <span className="h-2 w-2 rounded-full bg-green-500 shadow-[0_0_16px_rgba(34,197,94,0.6)]" />
@@ -58,6 +60,7 @@ export default function LoginClient() {
               <span className="text-white">Image Label</span>{" "}
               <span className="text-green-400">Reviewer</span>
             </h1>
+
             <p className="mt-2 text-sm text-zinc-300">
               Sign in to review and correct pest/disease labels.
             </p>
@@ -79,21 +82,19 @@ export default function LoginClient() {
                 </p>
               </div>
 
-              {/* mini badge */}
               <div className="shrink-0 rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-xs text-zinc-300">
                 Region: <span className="text-white">ap-south-1</span>
               </div>
             </div>
 
-            {/* Divider */}
             <div className="my-5 h-px bg-white/10" />
 
-            {/* Button */}
+            {/* Sign In Button */}
             <button
               disabled={checking || signingIn}
               onClick={() => {
                 setSigningIn(true)
-                router.replace("/auth/login")
+                window.location.href = "/auth/login"   // 🔥 full redirect (no router)
               }}
               className="group w-full h-11 rounded-xl bg-green-600 hover:bg-green-500 active:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed transition flex items-center justify-center gap-2 font-medium shadow-[0_10px_30px_rgba(34,197,94,0.25)]"
             >
@@ -117,14 +118,12 @@ export default function LoginClient() {
               )}
             </button>
 
-            {/* Helper text */}
             <p className="mt-4 text-xs text-zinc-400 leading-relaxed">
               Having trouble signing in? Try opening in a private window or clear site cookies for{" "}
               <span className="text-zinc-200">image-label-reviewer.vercel.app</span>.
             </p>
           </div>
 
-          {/* Footer */}
           <div className="mt-6 text-center text-xs text-zinc-500">
             © {new Date().getFullYear()} Image Label Reviewer • Secure session via HttpOnly cookies
           </div>
